@@ -45,11 +45,11 @@ export interface CompraFilters {
 }
 
 export const UNIDADES = [
+  { value: 'pz', label: 'Piezas (pz)' },
   { value: 'kg', label: 'Kilogramos (kg)' },
   { value: 'g', label: 'Gramos (g)' },
   { value: 'l', label: 'Litros (l)' },
   { value: 'ml', label: 'Mililitros (ml)' },
-  { value: 'pz', label: 'Piezas (pz)' },
   { value: 'caja', label: 'Cajas' },
   { value: 'costal', label: 'Costales' },
   { value: 'docena', label: 'Docenas' },

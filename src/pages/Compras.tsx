@@ -24,8 +24,13 @@ import { useSnackbar } from 'notistack';
 import dayjs from 'dayjs';
 
 import { useAuth } from '../contexts/AuthContext';
-import { compraService } from '../services/compraService';
-import { proveedorService } from '../services/proveedorService';
+// Importar desde firebase.ts donde ya está definido el servicio
+import { 
+  compraService, 
+  proveedorService,
+  formatCurrency,
+  formatDate
+} from '../services/firebase';
 
 // Componentes
 import CompraForm from '../components/compras/CompraForm';

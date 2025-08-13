@@ -1,5 +1,9 @@
 import * as yup from 'yup';
 import dayjs from 'dayjs';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+
+// Extender dayjs con el plugin necesario
+dayjs.extend(isSameOrBefore);
 
 export const compraSchema = yup.object({
   proveedorId: yup
