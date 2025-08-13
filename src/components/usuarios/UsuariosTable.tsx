@@ -1,4 +1,4 @@
-// src/components/usuarios/UsuariosTable.tsx
+
 import React from 'react';
 import {
   Table,
@@ -66,8 +66,8 @@ const roleLabels = {
 };
 
 const UsuariosTable: React.FC<UsuariosTableProps> = ({
-  usuarios,
-  stores,
+  usuarios = [], // 🔥 VALOR POR DEFECTO
+  stores = [], // 🔥 VALOR POR DEFECTO
   loading,
   onEdit,
   onView,
@@ -88,7 +88,9 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
     setPage(0);
   };
 
-  const paginatedUsuarios = usuarios.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // 🔥 PROTECCIÓN CONTRA UNDEFINED
+  const safeUsuarios = Array.isArray(usuarios) ? usuarios : [];
+  const paginatedUsuarios = safeUsuarios.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   if (loading) {
     return (
@@ -128,7 +130,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
     );
   }
 
-  if (usuarios.length === 0) {
+  if (safeUsuarios.length === 0) {
     return (
       <Box
         display="flex"
@@ -166,17 +168,20 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
           </TableHead>
           <TableBody>
             {paginatedUsuarios.map((usuario) => {
-              const storeNames = getStoreNames(usuario.storeAccess);
+              // 🔥 PROTECCIÓN TOTAL CONTRA UNDEFINED
+              const storeIds = usuario?.storeAccess || [];
+              const storeNames = getStoreNames ? getStoreNames(storeIds) : [];
+              const safeStoreNames = Array.isArray(storeNames) ? storeNames : [];
               
               return (
                 <TableRow 
-                  key={usuario.uid} 
+                  key={usuario?.uid || `user-${Math.random()}`} 
                   hover
                   sx={{ 
                     cursor: 'pointer',
-                    opacity: usuario.active ? 1 : 0.6 
+                    opacity: usuario?.active ? 1 : 0.6 
                   }}
-                  onClick={() => onView(usuario)}
+                  onClick={() => usuario && onView(usuario)}
                 >
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={2}>
@@ -184,17 +189,17 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                         sx={{ 
                           width: 40, 
                           height: 40,
-                          bgcolor: roleColors[usuario.role]
+                          bgcolor: usuario?.role ? roleColors[usuario.role] || 'primary.main' : 'grey.400'
                         }}
                       >
-                        {usuario.displayName.charAt(0).toUpperCase()}
+                        {usuario?.displayName ? usuario.displayName.charAt(0).toUpperCase() : 'U'}
                       </Avatar>
                       <Box>
                         <Typography variant="subtitle2" fontWeight={600}>
-                          {usuario.displayName}
+                          {usuario?.displayName || 'Sin nombre'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          ID: {usuario.uid.slice(-8)}
+                          ID: {usuario?.uid ? usuario.uid.slice(-8) : 'N/A'}
                         </Typography>
                       </Box>
                     </Box>
@@ -202,15 +207,15 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                   
                   <TableCell>
                     <Typography variant="body2">
-                      {usuario.email}
+                      {usuario?.email || 'Sin email'}
                     </Typography>
                   </TableCell>
                   
                   <TableCell>
                     <Chip
-                      icon={roleIcons[usuario.role]}
-                      label={roleLabels[usuario.role]}
-                      color={roleColors[usuario.role]}
+                      icon={usuario?.role ? roleIcons[usuario.role] || <PersonIcon /> : <PersonIcon />}
+                      label={usuario?.role ? roleLabels[usuario.role] || usuario.role : 'Sin rol'}
+                      color={usuario?.role ? roleColors[usuario.role] || 'default' : 'default'}
                       size="small"
                       variant="outlined"
                     />
@@ -218,50 +223,53 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                   
                   <TableCell>
                     <Box display="flex" flexWrap="wrap" gap={0.5}>
-                      {storeNames.length > 0 ? (
-                        storeNames.slice(0, 2).map((storeName, index) => (
-                          <Chip
-                            key={index}
-                            icon={<StoreIcon />}
-                            label={storeName}
-                            size="small"
-                            variant="outlined"
-                            color="default"
-                          />
-                        ))
+                      {safeStoreNames && safeStoreNames.length > 0 ? (
+                        // 🔥 PROTECCIÓN CONTRA EL SLICE ERROR
+                        <>
+                          {safeStoreNames.slice(0, 2).map((storeName, index) => (
+                            <Chip
+                              key={index}
+                              icon={<StoreIcon />}
+                              label={storeName || 'Tienda sin nombre'}
+                              size="small"
+                              variant="outlined"
+                              color="default"
+                            />
+                          ))}
+                          {safeStoreNames.length > 2 && (
+                            <Tooltip 
+                              title={safeStoreNames.slice(2).join(', ') || 'Tiendas adicionales'}
+                              arrow
+                            >
+                              <Chip
+                                label={`+${safeStoreNames.length - 2}`}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            </Tooltip>
+                          )}
+                        </>
                       ) : (
                         <Typography variant="caption" color="text.secondary">
                           Sin acceso
                         </Typography>
-                      )}
-                      {storeNames.length > 2 && (
-                        <Tooltip 
-                          title={storeNames.slice(2).join(', ')}
-                          arrow
-                        >
-                          <Chip
-                            label={`+${storeNames.length - 2}`}
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                          />
-                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
                   
                   <TableCell>
                     <Chip
-                      label={usuario.active ? 'Activo' : 'Inactivo'}
-                      color={usuario.active ? 'success' : 'default'}
+                      label={usuario?.active ? 'Activo' : 'Inactivo'}
+                      color={usuario?.active ? 'success' : 'default'}
                       size="small"
-                      variant={usuario.active ? 'filled' : 'outlined'}
+                      variant={usuario?.active ? 'filled' : 'outlined'}
                     />
                   </TableCell>
                   
                   <TableCell>
                     <Typography variant="body2">
-                      {formatDate(usuario.createdAt)}
+                      {usuario?.createdAt ? formatDate(usuario.createdAt) : 'Sin fecha'}
                     </Typography>
                   </TableCell>
                   
@@ -269,7 +277,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                     <IconButton
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMenuClick(e, usuario);
+                        if (usuario) onMenuClick(e, usuario);
                       }}
                       size="small"
                     >
@@ -286,7 +294,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
       <TablePagination
         rowsPerPageOptions={[5, 10, 25, 50]}
         component="div"
-        count={usuarios.length}
+        count={safeUsuarios.length}
         rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handleChangePage}

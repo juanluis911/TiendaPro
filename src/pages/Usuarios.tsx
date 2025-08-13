@@ -1,4 +1,3 @@
-// src/pages/Usuarios.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -120,30 +119,55 @@ const Usuarios: React.FC = () => {
   };
 
   // Filtrar usuarios
-  const filteredUsuarios = usuarios.filter(usuario => {
-    const matchesSearch = !filters.busqueda || 
-      usuario.displayName.toLowerCase().includes(filters.busqueda.toLowerCase()) ||
-      usuario.email.toLowerCase().includes(filters.busqueda.toLowerCase());
+  const filteredUsuarios = React.useMemo(() => {
+  // 🔥 VERIFICACIÓN DE SEGURIDAD
+  if (!usuarios || !Array.isArray(usuarios)) return [];
+  
+  return usuarios.filter(usuario => {
+    // Verificaciones de seguridad
+    if (!usuario) return false;
     
-    const matchesRole = !filters.role || usuario.role === filters.role;
-    
-    const matchesStatus = !filters.status || 
-      (filters.status === 'active' && usuario.active) ||
-      (filters.status === 'inactive' && !usuario.active);
-    
-    const matchesStore = !filters.storeAccess || 
-      usuario.storeAccess.includes(filters.storeAccess);
+    try {
+      const matchesSearch = !filters.busqueda || 
+        (usuario.displayName && usuario.displayName.toLowerCase().includes(filters.busqueda.toLowerCase())) ||
+        (usuario.email && usuario.email.toLowerCase().includes(filters.busqueda.toLowerCase()));
+      
+      const matchesRole = !filters.role || usuario.role === filters.role;
+      
+      const matchesStatus = !filters.status || 
+        (filters.status === 'active' && usuario.active) ||
+        (filters.status === 'inactive' && !usuario.active);
+      
+      const matchesStore = !filters.storeAccess || 
+        (usuario.storeAccess && Array.isArray(usuario.storeAccess) && usuario.storeAccess.includes(filters.storeAccess));
 
-    return matchesSearch && matchesRole && matchesStatus && matchesStore;
+      return matchesSearch && matchesRole && matchesStatus && matchesStore;
+    } catch (error) {
+      console.error('Error filtrando usuario:', error);
+      return false;
+    }
   });
+}, [usuarios, filters]);
 
   // Obtener nombres de tiendas
-  const getStoreNames = (storeIds: string[]) => {
+ const getStoreNames = (storeIds: string[] | undefined | null): string[] => {
+  // 🔥 VERIFICACIONES DE SEGURIDAD MÚLTIPLES
+  if (!storeIds) return [];
+  if (!Array.isArray(storeIds)) return [];
+  if (storeIds.length === 0) return [];
+  if (!stores || !Array.isArray(stores)) return [];
+  
+  try {
     return storeIds.map(id => {
-      const store = stores.find(s => s.id === id);
+      if (!id || typeof id !== 'string') return 'ID inválido';
+      const store = stores.find(s => s && s.id === id);
       return store?.name || 'Tienda no encontrada';
-    });
-  };
+    }).filter(name => name !== null && name !== undefined);
+  } catch (error) {
+    console.error('Error en getStoreNames:', error);
+    return [];
+  }
+};
 
   // Manejar acciones
   const handleCreateNew = () => {
