@@ -144,3 +144,5 @@ export interface DashboardStats {
   comprasEsteMes: number;
   pagosEsteMes: number;
 }
+
+export * from './compras';
