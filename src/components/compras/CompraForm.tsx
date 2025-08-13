@@ -76,25 +76,25 @@ const CompraForm: React.FC<CompraFormProps> = ({
 
   // Calcular subtotal automáticamente para cada producto
   useEffect(() => {
-    productos.forEach((producto, index) => {
-      const cantidad = Number(producto.cantidad) || 0;
-      const precioUnitario = Number(producto.precioUnitario) || 0;
-      const subtotal = cantidad * precioUnitario;
-      
-      // Solo actualizar si el subtotal ha cambiado para evitar loops infinitos
-      if (producto.subtotal !== subtotal) {
-        setValue(`productos.${index}.subtotal`, subtotal);
-      }
-    });
-  }, [productos.map(p => `${p.cantidad}-${p.precioUnitario}`).join(','), setValue]);
+  productos.forEach((producto, index) => {
+    const cantidad = Number(producto.cantidad) || 0;
+    const precioUnitario = Number(producto.precioUnitario) || 0;
+    const subtotal = cantidad * precioUnitario;
+    
+    // Solo actualizar si el subtotal ha cambiado para evitar loops infinitos
+    if (producto.subtotal !== subtotal) {
+      setValue(`productos.${index}.subtotal`, subtotal);
+    }
+  });
+}, [productos, setValue]); // Simplificar la dependencia
 
   // Calcular el total general
   const total = useMemo(() => {
-    return productos.reduce((sum, producto) => {
-      const subtotal = Number(producto.subtotal) || 0;
-      return sum + subtotal;
-    }, 0);
-  }, [productos]);
+  return productos.reduce((sum, producto) => {
+    const subtotal = Number(producto.subtotal) || 0;
+    return sum + subtotal;
+  }, 0);
+}, [productos]);
 
   // Actualizar el total en el formulario cuando cambie
   useEffect(() => {
@@ -118,8 +118,8 @@ const CompraForm: React.FC<CompraFormProps> = ({
         proveedorId: '',
         numeroFactura: '',
         fechaCompra: dayjs(),
-        fechaVencimiento: dayjs().add(30, 'days'),
-        productos: [{ nombre: '', cantidad: 1, unidad: 'kg', precioUnitario: 0, subtotal: 0 }],
+        fechaVencimiento: dayjs(), //dayjs().add(10, 'days'),
+        productos: [{ nombre: '', cantidad: 1, unidad: 'pz', precioUnitario: 0, subtotal: 0 }],
         total: 0,
         notas: '',
       });
@@ -145,7 +145,23 @@ const CompraForm: React.FC<CompraFormProps> = ({
       remove(index);
     }
   };
+  // Handler para actualizar cantidad
+const handleCantidadChange = (index: number, newCantidad: number) => {
+  const precioUnitario = Number(productos[index]?.precioUnitario) || 0;
+  const subtotal = newCantidad * precioUnitario;
+  
+  setValue(`productos.${index}.cantidad`, newCantidad);
+  setValue(`productos.${index}.subtotal`, subtotal);
+};
 
+// Handler para actualizar precio unitario
+const handlePrecioChange = (index: number, newPrecio: number) => {
+  const cantidad = Number(productos[index]?.cantidad) || 0;
+  const subtotal = cantidad * newPrecio;
+  
+  setValue(`productos.${index}.precioUnitario`, newPrecio);
+  setValue(`productos.${index}.subtotal`, subtotal);
+};
   return (
     <Dialog 
       open={open} 
@@ -300,13 +316,17 @@ const CompraForm: React.FC<CompraFormProps> = ({
                           <TextField
                             {...field}
                             fullWidth
-                            label="Cantidad *"
+                            label="Cantidad"
                             type="number"
                             size="small"
                             error={!!errors.productos?.[index]?.cantidad}
                             helperText={errors.productos?.[index]?.cantidad?.message}
                             disabled={isSubmitting}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            onChange={(e) => {
+                              const newValue = Number(e.target.value);
+                              field.onChange(newValue);
+                              handleCantidadChange(index, newValue);
+                            }}
                             inputProps={{ step: "0.01", min: "0" }}
                           />
                         )}
@@ -346,13 +366,17 @@ const CompraForm: React.FC<CompraFormProps> = ({
                           <TextField
                             {...field}
                             fullWidth
-                            label="Precio Unit. *"
+                            label="Precio Unitario"
                             type="number"
                             size="small"
                             error={!!errors.productos?.[index]?.precioUnitario}
                             helperText={errors.productos?.[index]?.precioUnitario?.message}
                             disabled={isSubmitting}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            onChange={(e) => {
+                              const newValue = Number(e.target.value);
+                              field.onChange(newValue);
+                              handlePrecioChange(index, newValue);
+                            }}
                             inputProps={{ step: "0.01", min: "0" }}
                           />
                         )}

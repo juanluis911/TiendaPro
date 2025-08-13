@@ -146,52 +146,61 @@ const Compras: React.FC = () => {
 
   // Manejar envío del formulario
   const handleSubmit = async (data: CompraFormData) => {
-    if (!userProfile?.organizationId) return;
+  if (!userProfile?.organizationId) return;
 
-    try {
-      setIsSubmitting(true);
-      
-      const compraData = {
-        organizationId: userProfile.organizationId,
-        storeId: selectedStore === 'all' ? userStores[0]?.id : selectedStore,
-        proveedorId: data.proveedorId,
-        numeroFactura: data.numeroFactura,
-        fechaCompra: data.fechaCompra.toDate(),
-        fechaVencimiento: data.fechaVencimiento.toDate(),
-        productos: data.productos.map(producto => ({
-          nombre: producto.nombre,
-          cantidad: Number(producto.cantidad),
-          unidad: producto.unidad,
-          precioUnitario: Number(producto.precioUnitario),
-          subtotal: Number(producto.cantidad) * Number(producto.precioUnitario)
-        })),
-        total: data.total,
-        estado: 'pendiente' as const,
-        notas: data.notas || '',
-        createdBy: userProfile.email,
-        createdAt: new Date(),
-      };
+  try {
+    setIsSubmitting(true);
+    
+    // Recalcular subtotales y total para asegurar consistencia
+    const productosConSubtotal = data.productos.map(producto => ({
+      nombre: producto.nombre,
+      cantidad: Number(producto.cantidad),
+      unidad: producto.unidad,
+      precioUnitario: Number(producto.precioUnitario),
+      subtotal: Number(producto.cantidad) * Number(producto.precioUnitario)
+    }));
 
-      if (editingCompra) {
-        await compraService.update(editingCompra.id, {
-          ...compraData,
-          updatedAt: new Date(),
-        });
-        enqueueSnackbar('Compra actualizada exitosamente', { variant: 'success' });
-      } else {
-        await compraService.create(compraData);
-        enqueueSnackbar('Compra registrada exitosamente', { variant: 'success' });
-      }
+    // Calcular el total basado en los subtotales
+    const totalCalculado = productosConSubtotal.reduce((sum, producto) => {
+      return sum + producto.subtotal;
+    }, 0);
+    
+    const compraData = {
+      organizationId: userProfile.organizationId,
+      storeId: selectedStore === 'all' ? 
+        userStores[0]?.id : selectedStore,
+      proveedorId: data.proveedorId,
+      numeroFactura: data.numeroFactura,
+      fechaCompra: data.fechaCompra.toDate(),
+      fechaVencimiento: data.fechaVencimiento.toDate(),
+      productos: productosConSubtotal,
+      total: totalCalculado, // Usar el total calculado, no el del formulario
+      estado: 'pendiente' as const,
+      notas: data.notas || '',
+      createdBy: userProfile.email,
+      createdAt: new Date(),
+    };
 
-      handleCloseDialog();
-      loadData();
-    } catch (error) {
-      console.error('Error saving compra:', error);
-      enqueueSnackbar('Error al guardar la compra', { variant: 'error' });
-    } finally {
-      setIsSubmitting(false);
+    if (editingCompra) {
+      await compraService.update(editingCompra.id, {
+        ...compraData,
+        updatedAt: new Date(),
+      });
+      enqueueSnackbar('Compra actualizada exitosamente', { variant: 'success' });
+    } else {
+      await compraService.create(compraData);
+      enqueueSnackbar('Compra registrada exitosamente', { variant: 'success' });
     }
-  };
+
+    handleCloseDialog();
+    loadData();
+  } catch (error) {
+    console.error('Error saving compra:', error);
+    enqueueSnackbar('Error al guardar la compra', { variant: 'error' });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Manejar edición
   const handleEdit = (compra: Compra) => {
