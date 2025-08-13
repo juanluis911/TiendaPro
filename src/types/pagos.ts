@@ -1,6 +1,7 @@
 // src/types/pagos.ts
 import { Timestamp } from 'firebase/firestore';
 
+// Extender el tipo Pago existente en tu proyecto
 export interface Pago {
   id: string;
   organizationId: string;

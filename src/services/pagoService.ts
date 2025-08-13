@@ -1,4 +1,4 @@
-// src/services/pagoService.ts
+// src/services/pagoService.ts - Integración con tu estructura existente
 import { 
   collection, 
   doc, 
@@ -12,14 +12,12 @@ import {
   orderBy, 
   Timestamp,
   writeBatch,
-  startAt,
-  endAt,
   limit
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Pago, PagoFormData, PagoConDetalles, PagoResumen } from '../types/pagos';
 import { Compra } from '../types/compras';
-import { Proveedor } from '../types/proveedores';
+import { Proveedor } from '../types';
 
 class PagoService {
   private collectionName = 'pagos';
@@ -68,10 +66,12 @@ class PagoService {
       for (const pago of pagos) {
         // Obtener información de la compra
         const compraDoc = await getDoc(doc(db, 'compras', pago.compraId));
+        if (!compraDoc.exists()) continue;
         const compraData = compraDoc.data() as Compra;
 
         // Obtener información del proveedor
         const proveedorDoc = await getDoc(doc(db, 'proveedores', pago.proveedorId));
+        if (!proveedorDoc.exists()) continue;
         const proveedorData = proveedorDoc.data() as Proveedor;
 
         // Calcular total pagado para esta compra
@@ -365,27 +365,8 @@ class PagoService {
       throw error;
     }
   }
-
-  /**
-   * Buscar pagos por referencia o notas
-   */
-  async searchByText(
-    organizationId: string, 
-    searchTerm: string, 
-    storeId?: string
-  ): Promise<Pago[]> {
-    try {
-      const pagos = await this.getByOrganizationAndStore(organizationId, storeId);
-      
-      return pagos.filter(pago => 
-        (pago.referencia?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (pago.notas?.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    } catch (error) {
-      console.error('Error searching pagos:', error);
-      throw error;
-    }
-  }
 }
 
-export default new PagoService();
+// Exportar instancia única del servicio (como en tu firebase.ts)
+const pagoService = new PagoService();
+export default pagoService;

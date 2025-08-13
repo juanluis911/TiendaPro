@@ -25,22 +25,27 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useSnackbar } from 'notistack';
 import { Timestamp } from 'firebase/firestore';
+import dayjs, { Dayjs } from 'dayjs';
 
-import { PagoFormData, METODOS_PAGO } from '../../types/pagos';
+import { METODOS_PAGO } from '../../types/pagos';
 import { Compra } from '../../types/compras';
 import { useAuth } from '../../contexts/AuthContext';
 import pagoService from '../../services/pagoService';
-import compraService from '../../services/compraService';
+import { compraService } from '../../services/firebase';
 
-// Esquema de validación
+// Esquema de validación actualizado para usar dayjs
 const schema = yup.object().shape({
   compraId: yup.string().required('Debe seleccionar una compra'),
   monto: yup.number()
     .positive('El monto debe ser mayor a 0')
     .required('El monto es requerido'),
-  fechaPago: yup.date()
-    .max(new Date(), 'La fecha no puede ser futura')
-    .required('La fecha de pago es requerida'),
+  fechaPago: yup.mixed()
+    .required('La fecha de pago es requerida')
+    .test('is-dayjs', 'Fecha inválida', (value) => dayjs.isDayjs(value))
+    .test('not-future', 'La fecha no puede ser futura', (value) => {
+      if (!dayjs.isDayjs(value)) return false;
+      return value.isSameOrBefore(dayjs(), 'day');
+    }),
   metodoPago: yup.string()
     .oneOf(['efectivo', 'transferencia', 'cheque', 'tarjeta'])
     .required('Debe seleccionar un método de pago'),
@@ -51,6 +56,16 @@ const schema = yup.object().shape({
   }),
   notas: yup.string().max(500, 'Las notas no pueden exceder 500 caracteres')
 });
+
+// Interfaz para el formulario usando dayjs
+interface PagoFormData {
+  compraId: string;
+  monto: number;
+  fechaPago: Dayjs;
+  metodoPago: 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta';
+  referencia?: string;
+  notas?: string;
+}
 
 interface PagoFormProps {
   open: boolean;
@@ -65,7 +80,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
   onSuccess,
   compraSeleccionada 
 }) => {
-  const { user } = useAuth();
+  const { userProfile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [compras, setCompras] = useState<Compra[]>([]);
@@ -78,7 +93,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
     defaultValues: {
       compraId: '',
       monto: 0,
-      fechaPago: new Date(),
+      fechaPago: dayjs(), // Usar dayjs directamente
       metodoPago: 'efectivo',
       referencia: '',
       notas: ''
@@ -92,12 +107,12 @@ const PagoForm: React.FC<PagoFormProps> = ({
   // Cargar compras con saldo pendiente
   useEffect(() => {
     const loadCompras = async () => {
-      if (!user?.organizationId || !open) return;
+      if (!userProfile?.organizationId || !open) return;
 
       try {
         const comprasData = await compraService.getByOrganizationAndStore(
-          user.organizationId,
-          user.storeAccess?.[0]
+          userProfile.organizationId,
+          userProfile.storeAccess?.[0]
         );
 
         // Filtrar solo compras con saldo pendiente
@@ -122,7 +137,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
     };
 
     loadCompras();
-  }, [user, open, compraSeleccionada, setValue, enqueueSnackbar]);
+  }, [userProfile, open, compraSeleccionada, setValue, enqueueSnackbar]);
 
   // Cargar información de la compra seleccionada
   useEffect(() => {
@@ -144,7 +159,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
           setSaldoPendiente(compra.total - totalPagadoCompra);
 
           // Establecer el monto por defecto al saldo pendiente
-          if (saldoPendiente > 0) {
+          if (compra.total - totalPagadoCompra > 0) {
             setValue('monto', compra.total - totalPagadoCompra);
           }
         }
@@ -157,39 +172,44 @@ const PagoForm: React.FC<PagoFormProps> = ({
   }, [watchCompraId, compras, setValue]);
 
   const onSubmit = async (data: PagoFormData) => {
-    if (!user || !compraInfo) return;
+    if (!userProfile || !compraInfo) return;
 
     setLoading(true);
     try {
       // Validar que el monto no exceda el saldo pendiente
       if (data.monto > saldoPendiente) {
-        enqueueSnackbar(`El monto no puede exceder el saldo pendiente de $${saldoPendiente.toFixed(2)}`, { 
+        enqueueSnackbar(`El monto no puede exceder el saldo pendiente de ${saldoPendiente.toFixed(2)}`, { 
           variant: 'error' 
         });
         return;
       }
 
       const pagoData = {
-        organizationId: user.organizationId!,
-        storeId: user.storeAccess?.[0] || '',
+        organizationId: userProfile.organizationId!,
+        storeId: userProfile.storeAccess?.[0] || '',
         compraId: data.compraId,
         proveedorId: compraInfo.proveedorId,
-        proveedorNombre: compraInfo.proveedorNombre,
-        compraNumeroFactura: compraInfo.numeroFactura,
         monto: data.monto,
-        fechaPago: Timestamp.fromDate(data.fechaPago),
+        fechaPago: Timestamp.fromDate(data.fechaPago.toDate()), // Convertir dayjs a Timestamp
         metodoPago: data.metodoPago,
         referencia: data.referencia || '',
         notas: data.notas || '',
-        registradoPor: user.uid,
-        registradoPorNombre: user.displayName || user.email || '',
+        registradoPor: userProfile.uid,
+        registradoPorNombre: userProfile.displayName || userProfile.email || '',
         createdAt: Timestamp.now()
       };
 
       await pagoService.createPagoAndUpdateCompra(pagoData, compraInfo.total);
 
       enqueueSnackbar('Pago registrado exitosamente', { variant: 'success' });
-      reset();
+      reset({
+        compraId: '',
+        monto: 0,
+        fechaPago: dayjs(),
+        metodoPago: 'efectivo',
+        referencia: '',
+        notas: ''
+      });
       onSuccess();
       onClose();
     } catch (error) {
@@ -201,7 +221,14 @@ const PagoForm: React.FC<PagoFormProps> = ({
   };
 
   const handleClose = () => {
-    reset();
+    reset({
+      compraId: '',
+      monto: 0,
+      fechaPago: dayjs(),
+      metodoPago: 'efectivo',
+      referencia: '',
+      notas: ''
+    });
     onClose();
   };
 
@@ -236,7 +263,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
                         <MenuItem key={compra.id} value={compra.id}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                             <span>
-                              {compra.proveedorNombre} - {compra.numeroFactura}
+                              {compra.proveedorNombre || 'Proveedor'} - {compra.numeroFactura}
                             </span>
                             <span>{formatCurrency(compra.total)}</span>
                           </Box>
@@ -266,7 +293,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
                         Proveedor
                       </Typography>
                       <Typography variant="body2" fontWeight="medium">
-                        {compraInfo.proveedorNombre}
+                        {compraInfo.proveedorNombre || 'No disponible'}
                       </Typography>
                     </Grid>
                     <Grid item xs={6} sm={3}>
@@ -350,6 +377,7 @@ const PagoForm: React.FC<PagoFormProps> = ({
                     label="Fecha de Pago *"
                     format="DD/MM/YYYY"
                     disabled={loading}
+                    maxDate={dayjs()} // No permitir fechas futuras
                     slotProps={{
                       textField: {
                         fullWidth: true,

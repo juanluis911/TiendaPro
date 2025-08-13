@@ -44,8 +44,8 @@ import {
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useSnackbar } from 'notistack';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 
 import { PagoConDetalles, METODOS_PAGO } from '../../types/pagos';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,7 +58,7 @@ interface PagosListProps {
 }
 
 const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
-  const { user } = useAuth();
+  const { userProfile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
   // Estados principales
@@ -69,8 +69,8 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
 
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [fechaInicio, setFechaInicio] = useState<Date | null>(null);
-  const [fechaFin, setFechaFin] = useState<Date | null>(null);
+  const [fechaInicio, setFechaInicio] = useState<dayjs.Dayjs | null>(null);
+  const [fechaFin, setFechaFin] = useState<dayjs.Dayjs | null>(null);
   const [metodoPagoFilter, setMetodoPagoFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -84,7 +84,7 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
 
   // Cargar pagos
   const loadPagos = async () => {
-    if (!user?.organizationId) return;
+    if (!userProfile?.organizationId) return;
 
     setLoading(true);
     try {
@@ -93,17 +93,17 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
       if (fechaInicio && fechaFin) {
         // Buscar por rango de fechas si están definidas
         const pagosPorFecha = await pagoService.getByDateRange(
-          user.organizationId,
-          fechaInicio,
-          fechaFin,
-          user.storeAccess?.[0]
+          userProfile.organizationId,
+          fechaInicio.toDate(), // Convertir dayjs a Date
+          fechaFin.toDate(),    // Convertir dayjs a Date
+          userProfile.storeAccess?.[0]
         );
 
         // Obtener detalles para cada pago
         for (const pago of pagosPorFecha) {
           const pagosConDetalles = await pagoService.getWithDetails(
-            user.organizationId,
-            user.storeAccess?.[0]
+            userProfile.organizationId,
+            userProfile.storeAccess?.[0]
           );
           const pagoConDetalle = pagosConDetalles.find(p => p.id === pago.id);
           if (pagoConDetalle) {
@@ -113,8 +113,8 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
       } else {
         // Cargar todos los pagos con detalles
         pagosData = await pagoService.getWithDetails(
-          user.organizationId,
-          user.storeAccess?.[0]
+          userProfile.organizationId,
+          userProfile.storeAccess?.[0]
         );
       }
 
@@ -129,7 +129,7 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
 
   useEffect(() => {
     loadPagos();
-  }, [user, fechaInicio, fechaFin]);
+  }, [userProfile, fechaInicio, fechaFin]);
 
   // Filtrar pagos
   const filteredPagos = pagos.filter((pago) => {
@@ -281,32 +281,32 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
           {showFilters && (
             <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={3}>
-                  <DatePicker
-                    label="Fecha Inicio"
-                    value={fechaInicio}
-                    onChange={setFechaInicio}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        size: 'small'
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <DatePicker
-                    label="Fecha Fin"
-                    value={fechaFin}
-                    onChange={setFechaFin}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        size: 'small'
-                      }
-                    }}
-                  />
-                </Grid>
+            <Grid item xs={12} md={3}>
+              <DatePicker
+                label="Fecha Inicio"
+                value={fechaInicio}
+                onChange={setFechaInicio}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    size: 'small'
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <DatePicker
+                label="Fecha Fin"
+                value={fechaFin}
+                onChange={setFechaFin}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    size: 'small'
+                  }
+                }}
+              />
+            </Grid>
                 <Grid item xs={12} md={3}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Método de Pago</InputLabel>
@@ -376,10 +376,10 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
                   <TableRow key={pago.id} hover>
                     <TableCell>
                       <Typography variant="body2">
-                        {format(pago.fechaPago.toDate(), 'dd/MM/yyyy', { locale: es })}
+                        {dayjs(pago.fechaPago.toDate()).format('DD/MM/YYYY')}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {format(pago.fechaPago.toDate(), 'HH:mm', { locale: es })}
+                        {dayjs(pago.fechaPago.toDate()).format('HH:mm')}
                       </Typography>
                     </TableCell>
                     
@@ -510,7 +510,7 @@ const PagosList: React.FC<PagosListProps> = ({ onNuevoPago }) => {
                 <strong>Monto:</strong> {formatCurrency(pagoToDelete.monto)}
               </Typography>
               <Typography variant="body2">
-                <strong>Fecha:</strong> {format(pagoToDelete.fechaPago.toDate(), 'dd/MM/yyyy')}
+                <strong>Fecha:</strong> {dayjs(pagoToDelete.fechaPago.toDate()).format('DD/MM/YYYY')}
               </Typography>
             </Box>
           )}

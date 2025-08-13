@@ -28,15 +28,18 @@ import {
   Visibility as ViewIcon
 } from '@mui/icons-material';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { format, startOfMonth, endOfMonth, subMonths, isSameMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
+
+// Configurar dayjs para usar español
+dayjs.locale('es');
 import { useSnackbar } from 'notistack';
 
 import { PagoConDetalles, PagoResumen, METODOS_PAGO } from '../../types/pagos';
 import { Compra } from '../../types/compras';
 import { useAuth } from '../../contexts/AuthContext';
 import pagoService from '../../services/pagoService';
-import compraService from '../../services/compraService';
+import { compraService } from '../../services/firebase';
 import PagoForm from './PagoForm';
 
 interface PagosDashboardProps {
@@ -44,7 +47,7 @@ interface PagosDashboardProps {
 }
 
 const PagosDashboard: React.FC<PagosDashboardProps> = ({ onVerTodosPagos }) => {
-  const { user } = useAuth();
+  const { userProfile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
   const [loading, setLoading] = useState(true);
@@ -56,28 +59,28 @@ const PagosDashboard: React.FC<PagosDashboardProps> = ({ onVerTodosPagos }) => {
 
   // Cargar datos del dashboard
   const loadDashboardData = async () => {
-    if (!user?.organizationId) return;
+    if (!userProfile?.organizationId) return;
 
     setLoading(true);
     try {
       // Cargar resumen de pagos
       const resumenData = await pagoService.getResumen(
-        user.organizationId,
-        user.storeAccess?.[0]
+        userProfile.organizationId,
+        userProfile.storeAccess?.[0]
       );
       setResumen(resumenData);
 
       // Cargar pagos recientes (últimos 10)
       const pagosData = await pagoService.getWithDetails(
-        user.organizationId,
-        user.storeAccess?.[0]
+        userProfile.organizationId,
+        userProfile.storeAccess?.[0]
       );
       setPagosRecientes(pagosData.slice(0, 10));
 
       // Cargar compras pendientes
       const comprasPendientesData = await compraService.getByOrganizationAndStore(
-        user.organizationId,
-        user.storeAccess?.[0]
+        userProfile.organizationId,
+        userProfile.storeAccess?.[0]
       );
       const pendientes = comprasPendientesData.filter(compra => 
         compra.estado === 'pendiente' || compra.estado === 'parcial'
@@ -87,21 +90,21 @@ const PagosDashboard: React.FC<PagosDashboardProps> = ({ onVerTodosPagos }) => {
       // Cargar datos para gráfica de pagos por mes (últimos 6 meses)
       const mesesData = [];
       for (let i = 5; i >= 0; i--) {
-        const fecha = subMonths(new Date(), i);
-        const inicioMes = startOfMonth(fecha);
-        const finMes = endOfMonth(fecha);
+        const fecha = dayjs().subtract(i, 'month');
+        const inicioMes = fecha.startOf('month').toDate();
+        const finMes = fecha.endOf('month').toDate();
         
         const pagosDelMes = await pagoService.getByDateRange(
-          user.organizationId,
+          userProfile.organizationId,
           inicioMes,
           finMes,
-          user.storeAccess?.[0]
+          userProfile.storeAccess?.[0]
         );
         
         const totalMes = pagosDelMes.reduce((sum, pago) => sum + pago.monto, 0);
         
         mesesData.push({
-          mes: format(fecha, 'MMM yyyy', { locale: es }),
+          mes: fecha.format('MMM YYYY'),
           total: totalMes,
           cantidad: pagosDelMes.length
         });
@@ -118,7 +121,7 @@ const PagosDashboard: React.FC<PagosDashboardProps> = ({ onVerTodosPagos }) => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [user]);
+  }, [userProfile]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -375,7 +378,7 @@ const PagosDashboard: React.FC<PagosDashboardProps> = ({ onVerTodosPagos }) => {
                                 {pago.compraInfo.numeroFactura}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                {format(pago.fechaPago.toDate(), 'dd/MM/yyyy')}
+                                {dayjs(pago.fechaPago.toDate()).format('DD/MM/YYYY')}
                               </Typography>
                             </Box>
                           }

@@ -23,8 +23,8 @@ import {
   Payment as PaymentIcon,
   Description as DescriptionIcon
 } from '@mui/icons-material';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 
 import { PagoConDetalles, METODOS_PAGO } from '../../types/pagos';
 
@@ -95,10 +95,10 @@ const PagoDetail: React.FC<PagoDetailProps> = ({ open, onClose, pago }) => {
                       </Typography>
                     </Box>
                     <Typography variant="h6">
-                      {format(pago.fechaPago.toDate(), 'EEEE, dd MMMM yyyy', { locale: es })}
+                      {dayjs(pago.fechaPago.toDate()).format('dddd, DD MMMM YYYY')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {format(pago.fechaPago.toDate(), 'HH:mm', { locale: es })} hrs
+                      {dayjs(pago.fechaPago.toDate()).format('HH:mm')} hrs
                     </Typography>
                   </Grid>
 
@@ -181,7 +181,7 @@ const PagoDetail: React.FC<PagoDetailProps> = ({ open, onClose, pago }) => {
                   Fecha de Compra
                 </Typography>
                 <Typography variant="body1" gutterBottom>
-                  {format(pago.compraInfo.fechaCompra.toDate(), 'dd/MM/yyyy', { locale: es })}
+                  {dayjs(pago.compraInfo.fechaCompra.toDate()).format('DD/MM/YYYY')}
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -337,7 +337,7 @@ const PagoDetail: React.FC<PagoDetailProps> = ({ open, onClose, pago }) => {
                   Fecha de registro
                 </Typography>
                 <Typography variant="body2">
-                  {format(pago.createdAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: es })}
+                  {dayjs(pago.createdAt.toDate()).format('DD/MM/YYYY HH:mm')}
                 </Typography>
               </Grid>
             </Grid>
