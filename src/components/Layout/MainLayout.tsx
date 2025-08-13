@@ -1,5 +1,7 @@
 // src/components/layout/MainLayout.tsx
 import React, { useState } from 'react';
+import { PointOfSale } from '@mui/icons-material'; // Agregar esta importación
+
 import {
   Box,
   Drawer,
@@ -34,6 +36,8 @@ import {
   AccountCircle,
   Logout,
   Business,
+  PointOfSaleRounded,    // ← NUEVO
+  Launch as LaunchIcon  // ← NUEVO
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -86,6 +90,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <Dashboard />,
       path: '/dashboard',
       permission: null,
+    },
+    {
+      text: 'Punto de Venta',  // ← NUEVO ITEM
+      icon: <PointOfSaleRounded />,
+      path: '/pos',
+      permission: null, // Sin permisos especiales
+      openInNewTab: true, // ← NUEVA PROPIEDAD
     },
     {
       text: 'Proveedores',

@@ -141,6 +141,13 @@ const App: React.FC = () => {
                 } />
                 <Route path="/pos" element={<POS />} />
                 
+                <Route path="/proveedores" element={
+                  <ProtectedRoute requiredPermission="proveedores">
+                    <MainLayout>
+                      <Proveedores />
+                    </MainLayout>
+                  </ProtectedRoute>
+                } />
                 <Route path="/compras" element={
                   <ProtectedRoute requiredPermission="proveedores">
                     <MainLayout>
