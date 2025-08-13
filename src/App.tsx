@@ -22,6 +22,9 @@ import Usuarios from './pages/Usuarios';
 import Reportes from './pages/Reportes';
 import Configuracion from './pages/Configuracion';
 import NotFound from './pages/NotFound';
+import POSSystem from './components/pos/POSSystem';
+import POS from './pages/POS';
+
 
 
 
@@ -129,14 +132,14 @@ const App: React.FC = () => {
                     </MainLayout>
                   </ProtectedRoute>
                 } />
-                
-                <Route path="/proveedores" element={
-                  <ProtectedRoute requiredPermission="proveedores">
+                <Route path="/pos" element={
+                  <ProtectedRoute>
                     <MainLayout>
-                      <Proveedores />
+                      <POSSystem />
                     </MainLayout>
                   </ProtectedRoute>
                 } />
+                <Route path="/pos" element={<POS />} />
                 
                 <Route path="/compras" element={
                   <ProtectedRoute requiredPermission="proveedores">
