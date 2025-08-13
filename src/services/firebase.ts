@@ -16,6 +16,8 @@ import {
   DocumentData,
   Timestamp,
   serverTimestamp,
+  setDoc,        // ⭐ AGREGAR ESTA LÍNEA
+  writeBatch    // ⭐ AGREGAR ESTA LÍNEA TAMBIÉN
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 

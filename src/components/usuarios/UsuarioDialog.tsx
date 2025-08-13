@@ -1,63 +1,104 @@
-// src/components/usuarios/UsuariosTable.tsx - VERSIÓN CORREGIDA
-import React from 'react';
+// src/components/usuarios/UsuarioDialog.tsx
+import React, { useState, useEffect } from 'react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  IconButton,
-  Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Switch,
   Box,
   Typography,
-  Skeleton,
-  Tooltip,
-  TablePagination,
+  Alert,
+  Grid,
+  Paper,
+  FormGroup,
+  Checkbox,
+  IconButton,
 } from '@mui/material';
 import {
-  MoreVert as MoreVertIcon,
+  Close as CloseIcon,
   Person as PersonIcon,
-  AdminPanelSettings as AdminIcon,
-  SupervisorAccount as ManagerIcon,
-  Work as EmpleadoIcon,
-  PointOfSale as VendedorIcon,
+  Email as EmailIcon,
+  Security as SecurityIcon,
   Store as StoreIcon,
 } from '@mui/icons-material';
-import { UserProfile, Store } from '../../types';
-import { formatDate } from '../../services/firebase';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import { useSnackbar } from 'notistack';
+import { UserProfile, UserRole, Store } from '../../types';
+import { userService } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 
-interface UsuariosTableProps {
-  usuarios: UserProfile[];
+interface UsuarioDialogProps {
+  open: boolean;
+  usuario?: UserProfile | null;
   stores: Store[];
-  loading: boolean;
-  onEdit: (usuario: UserProfile) => void;
-  onView: (usuario: UserProfile) => void;
-  onToggleStatus: (usuario: UserProfile) => void;
-  onDelete: (usuario: UserProfile) => void;
-  onMenuClick: (event: React.MouseEvent<HTMLElement>, usuario: UserProfile) => void;
-  getStoreNames: (storeIds: string[]) => string[];
+  onClose: (reload?: boolean) => void;
 }
 
-const roleIcons = {
-  owner: <AdminIcon />,
-  admin: <AdminIcon />,
-  manager: <ManagerIcon />,
-  empleado: <EmpleadoIcon />,
-  vendedor: <VendedorIcon />,
-};
+interface UsuarioFormData {
+  email: string;
+  displayName: string;
+  password?: string;
+  role: UserRole;
+  storeAccess: string[];
+  permissions: {
+    proveedores: boolean;
+    inventario: boolean;
+    ventas: boolean;
+    reportes: boolean;
+    configuracion: boolean;
+    multitienda: boolean;
+  };
+  active: boolean;
+}
 
-const roleColors = {
-  owner: 'error' as const,
-  admin: 'warning' as const,
-  manager: 'info' as const,
-  empleado: 'primary' as const,
-  vendedor: 'success' as const,
-};
+const schema = yup.object({
+  email: yup
+    .string()
+    .email('Formato de email inválido')
+    .required('El email es requerido'),
+  displayName: yup
+    .string()
+    .required('El nombre es requerido')
+    .min(2, 'El nombre debe tener al menos 2 caracteres'),
+  password: yup
+    .string()
+    .when('$isEditing', {
+      is: false,
+      then: (schema) => schema.required('La contraseña es requerida').min(6, 'Mínimo 6 caracteres'),
+      otherwise: (schema) => schema.optional(),
+    }),
+  role: yup
+    .string()
+    .oneOf(['owner', 'admin', 'manager', 'empleado', 'vendedor'])
+    .required('El rol es requerido'),
+  storeAccess: yup
+    .array()
+    .of(yup.string())
+    .min(1, 'Debe seleccionar al menos una tienda'),
+  permissions: yup.object({
+    proveedores: yup.boolean(),
+    inventario: yup.boolean(),
+    ventas: yup.boolean(),
+    reportes: yup.boolean(),
+    configuracion: yup.boolean(),
+    multitienda: yup.boolean(),
+  }),
+  active: yup.boolean(),
+});
 
-const roleLabels = {
+const roleLabels: Record<UserRole, string> = {
   owner: 'Propietario',
   admin: 'Administrador',
   manager: 'Gerente',
@@ -65,244 +106,503 @@ const roleLabels = {
   vendedor: 'Vendedor',
 };
 
-const UsuariosTable: React.FC<UsuariosTableProps> = ({
-  usuarios = [], // ✅ Valor por defecto para evitar undefined
-  stores = [], // ✅ Valor por defecto para evitar undefined
-  loading,
-  onEdit,
-  onView,
-  onToggleStatus,
-  onDelete,
-  onMenuClick,
-  getStoreNames,
+const permissionLabels = {
+  proveedores: 'Gestión de Proveedores',
+  inventario: 'Control de Inventario',
+  ventas: 'Gestión de Ventas',
+  reportes: 'Reportes y Estadísticas',
+  configuracion: 'Configuración del Sistema',
+  multitienda: 'Gestión Multi-tienda',
+};
+
+const UsuarioDialog: React.FC<UsuarioDialogProps> = ({
+  open,
+  usuario,
+  stores = [], // Valor por defecto
+  onClose,
 }) => {
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const { userProfile } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
+  const [loading, setLoading] = useState(false);
+  const isEditing = Boolean(usuario);
 
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<UsuarioFormData>({
+    resolver: yupResolver(schema, { context: { isEditing } }),
+    defaultValues: {
+      email: '',
+      displayName: '',
+      password: '',
+      role: 'empleado',
+      storeAccess: [],
+      permissions: {
+        proveedores: false,
+        inventario: false,
+        ventas: false,
+        reportes: false,
+        configuracion: false,
+        multitienda: false,
+      },
+      active: true,
+    },
+  });
+
+  const selectedRole = watch('role');
+
+  // Cargar datos del usuario al abrir el diálogo
+  useEffect(() => {
+    if (open) {
+      if (usuario) {
+        // Editar usuario existente
+        reset({
+          email: usuario.email,
+          displayName: usuario.displayName,
+          role: usuario.role,
+          storeAccess: usuario.storeAccess || [],
+          permissions: usuario.permissions || {
+            proveedores: false,
+            inventario: false,
+            ventas: false,
+            reportes: false,
+            configuracion: false,
+            multitienda: false,
+          },
+          active: usuario.active,
+        });
+      } else {
+        // Nuevo usuario
+        reset({
+          email: '',
+          displayName: '',
+          password: '',
+          role: 'empleado',
+          storeAccess: [],
+          permissions: {
+            proveedores: false,
+            inventario: false,
+            ventas: false,
+            reportes: false,
+            configuracion: false,
+            multitienda: false,
+          },
+          active: true,
+        });
+      }
+    }
+  }, [open, usuario, reset]);
+
+  // Configurar permisos predeterminados según el rol
+  useEffect(() => {
+    const defaultPermissions = {
+      owner: {
+        proveedores: true,
+        inventario: true,
+        ventas: true,
+        reportes: true,
+        configuracion: true,
+        multitienda: true,
+      },
+      admin: {
+        proveedores: true,
+        inventario: true,
+        ventas: true,
+        reportes: true,
+        configuracion: true,
+        multitienda: true,
+      },
+      manager: {
+        proveedores: true,
+        inventario: true,
+        ventas: true,
+        reportes: true,
+        configuracion: false,
+        multitienda: false,
+      },
+      empleado: {
+        proveedores: true,
+        inventario: true,
+        ventas: false,
+        reportes: false,
+        configuracion: false,
+        multitienda: false,
+      },
+      vendedor: {
+        proveedores: false,
+        inventario: true,
+        ventas: true,
+        reportes: false,
+        configuracion: false,
+        multitienda: false,
+      },
+    };
+
+    if (selectedRole && !isEditing) {
+      setValue('permissions', defaultPermissions[selectedRole]);
+    }
+  }, [selectedRole, setValue, isEditing]);
+
+  const handleSelectAllStores = () => {
+    const allStoreIds = stores.filter(store => store?.active).map(store => store.id);
+    setValue('storeAccess', allStoreIds);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+  const handleDeselectAllStores = () => {
+    setValue('storeAccess', []);
   };
 
-  // ✅ VERIFICACIÓN DE SEGURIDAD para evitar el error de slice
-  const safeUsuarios = usuarios || [];
-  const paginatedUsuarios = safeUsuarios.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const onSubmit = async (data: UsuarioFormData) => {
+    if (!userProfile?.organizationId) {
+      enqueueSnackbar('Error: No se encontró la organización', { variant: 'error' });
+      return;
+    }
 
-  if (loading) {
-    return (
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Usuario</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Rol</TableCell>
-              <TableCell>Tiendas</TableCell>
-              <TableCell>Estado</TableCell>
-              <TableCell>Creado</TableCell>
-              <TableCell align="right">Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {[...Array(5)].map((_, index) => (
-              <TableRow key={index}>
-                <TableCell>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Skeleton variant="circular" width={40} height={40} />
-                    <Skeleton variant="text" width={120} />
-                  </Box>
-                </TableCell>
-                <TableCell><Skeleton variant="text" width={180} /></TableCell>
-                <TableCell><Skeleton variant="rectangular" width={80} height={24} /></TableCell>
-                <TableCell><Skeleton variant="text" width={100} /></TableCell>
-                <TableCell><Skeleton variant="rectangular" width={70} height={24} /></TableCell>
-                <TableCell><Skeleton variant="text" width={80} /></TableCell>
-                <TableCell><Skeleton variant="circular" width={40} height={40} /></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  }
+    try {
+      setLoading(true);
 
-  if (safeUsuarios.length === 0) {
-    return (
-      <Box
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        py={8}
-        gap={2}
-      >
-        <PersonIcon sx={{ fontSize: 64, color: 'text.secondary' }} />
-        <Typography variant="h6" color="text.secondary">
-          No hay usuarios registrados
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Comienza creando tu primer usuario del sistema
-        </Typography>
-      </Box>
-    );
-  }
+      if (isEditing && usuario) {
+        // Actualizar usuario existente
+        const updateData: Partial<UserProfile> = {
+          displayName: data.displayName,
+          role: data.role,
+          storeAccess: data.storeAccess,
+          permissions: data.permissions,
+          active: data.active,
+        };
+
+        await userService.update(usuario.uid, updateData);
+        enqueueSnackbar('Usuario actualizado correctamente', { variant: 'success' });
+      } else {
+        // Crear nuevo usuario
+        if (!data.password) {
+          throw new Error('La contraseña es requerida para nuevos usuarios');
+        }
+
+        // Crear usuario en Firebase Auth
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          data.email,
+          data.password
+        );
+
+        // Crear perfil en Firestore
+        const newUserData: Omit<UserProfile, 'uid'> = {
+          email: data.email,
+          displayName: data.displayName,
+          organizationId: userProfile.organizationId,
+          role: data.role,
+          storeAccess: data.storeAccess,
+          permissions: data.permissions,
+          active: data.active,
+          createdAt: new Date() as any,
+          createdBy: userProfile.uid,
+        };
+
+        await userService.createWithId(userCredential.user.uid, newUserData);
+        enqueueSnackbar('Usuario creado correctamente', { variant: 'success' });
+      }
+
+      onClose(true);
+    } catch (error: any) {
+      console.error('Error saving usuario:', error);
+      
+      let errorMessage = 'Error al guardar el usuario';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'Este email ya está registrado';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'La contraseña es muy débil';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'El formato del email es inválido';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      enqueueSnackbar(errorMessage, { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canEditRole = () => {
+    if (!userProfile) return false;
+    // Solo owner y admin pueden cambiar roles
+    return ['owner', 'admin'].includes(userProfile.role);
+  };
+
+  const getAvailableRoles = (): UserRole[] => {
+    if (!userProfile) return [];
+    
+    switch (userProfile.role) {
+      case 'owner':
+        return ['owner', 'admin', 'manager', 'empleado', 'vendedor'];
+      case 'admin':
+        return ['admin', 'manager', 'empleado', 'vendedor'];
+      default:
+        return ['empleado', 'vendedor'];
+    }
+  };
 
   return (
-    <>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Usuario</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Rol</TableCell>
-              <TableCell>Tiendas de Acceso</TableCell>
-              <TableCell>Estado</TableCell>
-              <TableCell>Fecha de Creación</TableCell>
-              <TableCell align="right">Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedUsuarios.map((usuario) => {
-              // ✅ VERIFICACIÓN DE SEGURIDAD para storeAccess
-              const storeIds = usuario.storeAccess || [];
-              const storeNames = getStoreNames(storeIds);
-              
-              return (
-                <TableRow 
-                  key={usuario.uid} 
-                  hover
-                  sx={{ 
-                    cursor: 'pointer',
-                    opacity: usuario.active ? 1 : 0.6 
-                  }}
-                  onClick={() => onView(usuario)}
-                >
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Avatar 
-                        sx={{ 
-                          width: 40, 
-                          height: 40,
-                          bgcolor: roleColors[usuario.role] || 'primary.main'
-                        }}
-                      >
-                        {usuario.displayName ? usuario.displayName.charAt(0).toUpperCase() : 'U'}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight={600}>
-                          {usuario.displayName || 'Sin nombre'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          ID: {usuario.uid ? usuario.uid.slice(-8) : 'N/A'}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Typography variant="body2">
-                      {usuario.email || 'Sin email'}
-                    </Typography>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Chip
-                      icon={roleIcons[usuario.role] || <PersonIcon />}
-                      label={roleLabels[usuario.role] || usuario.role}
-                      color={roleColors[usuario.role] || 'default'}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Box display="flex" flexWrap="wrap" gap={0.5}>
-                      {storeNames && storeNames.length > 0 ? (
-                        // ✅ VERIFICACIÓN DE SEGURIDAD para slice
-                        storeNames.slice(0, 2).map((storeName, index) => (
-                          <Chip
-                            key={index}
-                            icon={<StoreIcon />}
-                            label={storeName}
-                            size="small"
-                            variant="outlined"
-                            color="default"
-                          />
-                        ))
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          Sin acceso
-                        </Typography>
+    <Dialog
+      open={open}
+      onClose={() => onClose()}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { minHeight: '80vh' }
+      }}
+    >
+      <DialogTitle>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box display="flex" alignItems="center" gap={1}>
+            <PersonIcon />
+            <Typography variant="h6">
+              {isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
+            </Typography>
+          </Box>
+          <IconButton onClick={() => onClose()}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <DialogContent dividers>
+          <Grid container spacing={3}>
+            {/* Información básica */}
+            <Grid item xs={12}>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <EmailIcon color="primary" />
+                  <Typography variant="h6">Información Personal</Typography>
+                </Box>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Controller
+                      name="email"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          label="Email"
+                          type="email"
+                          fullWidth
+                          disabled={isEditing}
+                          error={!!errors.email}
+                          helperText={errors.email?.message}
+                        />
                       )}
-                      {storeNames && storeNames.length > 2 && (
-                        <Tooltip 
-                          title={storeNames.slice(2).join(', ')}
-                          arrow
-                        >
-                          <Chip
-                            label={`+${storeNames.length - 2}`}
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                          />
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Chip
-                      label={usuario.active ? 'Activo' : 'Inactivo'}
-                      color={usuario.active ? 'success' : 'default'}
-                      size="small"
-                      variant={usuario.active ? 'filled' : 'outlined'}
                     />
-                  </TableCell>
+                  </Grid>
                   
-                  <TableCell>
-                    <Typography variant="body2">
-                      {usuario.createdAt ? formatDate(usuario.createdAt) : 'Sin fecha'}
-                    </Typography>
-                  </TableCell>
+                  <Grid item xs={12} md={6}>
+                    <Controller
+                      name="displayName"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          label="Nombre completo"
+                          fullWidth
+                          error={!!errors.displayName}
+                          helperText={errors.displayName?.message}
+                        />
+                      )}
+                    />
+                  </Grid>
                   
-                  <TableCell align="right">
-                    <IconButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMenuClick(e, usuario);
-                      }}
-                      size="small"
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      
-      <TablePagination
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        component="div"
-        count={safeUsuarios.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        labelRowsPerPage="Filas por página:"
-        labelDisplayedRows={({ from, to, count }) =>
-          `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
-        }
-      />
-    </>
+                  {!isEditing && (
+                    <Grid item xs={12} md={6}>
+                      <Controller
+                        name="password"
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            label="Contraseña"
+                            type="password"
+                            fullWidth
+                            error={!!errors.password}
+                            helperText={errors.password?.message}
+                          />
+                        )}
+                      />
+                    </Grid>
+                  )}
+                </Grid>
+              </Paper>
+            </Grid>
+
+            {/* Rol y configuración */}
+            <Grid item xs={12}>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <SecurityIcon color="primary" />
+                  <Typography variant="h6">Rol y Configuración</Typography>
+                </Box>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Controller
+                      name="role"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControl fullWidth error={!!errors.role}>
+                          <InputLabel>Rol</InputLabel>
+                          <Select
+                            {...field}
+                            label="Rol"
+                            disabled={!canEditRole()}
+                          >
+                            {getAvailableRoles().map((role) => (
+                              <MenuItem key={role} value={role}>
+                                {roleLabels[role]}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} md={6}>
+                    <Controller
+                      name="active"
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={field.value}
+                              onChange={field.onChange}
+                              color="primary"
+                            />
+                          }
+                          label="Usuario activo"
+                        />
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+
+            {/* Acceso a tiendas */}
+            <Grid item xs={12}>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <StoreIcon color="primary" />
+                    <Typography variant="h6">Acceso a Tiendas</Typography>
+                  </Box>
+                  <Box>
+                    <Button size="small" onClick={handleSelectAllStores}>
+                      Seleccionar todas
+                    </Button>
+                    <Button size="small" onClick={handleDeselectAllStores}>
+                      Deseleccionar todas
+                    </Button>
+                  </Box>
+                </Box>
+                
+                <Controller
+                  name="storeAccess"
+                  control={control}
+                  render={({ field }) => (
+                    <FormGroup>
+                      <Grid container spacing={1}>
+                        {stores.filter(store => store?.active).map((store) => (
+                          <Grid item xs={12} sm={6} md={4} key={store.id}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={field.value.includes(store.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      field.onChange([...field.value, store.id]);
+                                    } else {
+                                      field.onChange(field.value.filter(id => id !== store.id));
+                                    }
+                                  }}
+                                />
+                              }
+                              label={store.name}
+                            />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </FormGroup>
+                  )}
+                />
+                {errors.storeAccess && (
+                  <Typography color="error" variant="caption">
+                    {errors.storeAccess.message}
+                  </Typography>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Permisos */}
+            <Grid item xs={12}>
+              <Paper elevation={1} sx={{ p: 2 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <SecurityIcon color="primary" />
+                  <Typography variant="h6">Permisos del Sistema</Typography>
+                </Box>
+                
+                <Grid container spacing={2}>
+                  {Object.entries(permissionLabels).map(([key, label]) => (
+                    <Grid item xs={12} sm={6} md={4} key={key}>
+                      <Controller
+                        name={`permissions.${key as keyof UsuarioFormData['permissions']}`}
+                        control={control}
+                        render={({ field }) => (
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={field.value}
+                                onChange={field.onChange}
+                                disabled={key === 'multitienda' && !['owner', 'admin'].includes(selectedRole)}
+                              />
+                            }
+                            label={label}
+                          />
+                        )}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+                
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  Los permisos se configuran automáticamente según el rol seleccionado, pero pueden ser personalizados.
+                </Alert>
+              </Paper>
+            </Grid>
+          </Grid>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => onClose()} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear Usuario')}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 };
 
-export default UsuariosTable;
+export default UsuarioDialog;
