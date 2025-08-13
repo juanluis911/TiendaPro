@@ -14,5 +14,10 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
+    // Definir process para compatibilidad con algunas librerías
+    'process.env': {},
   },
+  optimizeDeps: {
+    include: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage']
+  }
 });

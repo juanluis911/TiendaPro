@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { UserProfile } from '../../types';
 
 const drawerWidth = 280;
 
@@ -90,43 +91,43 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       text: 'Proveedores',
       icon: <Business />,
       path: '/proveedores',
-      permission: 'proveedores' as keyof typeof userProfile.permissions,
+      permission: 'proveedores' as keyof UserProfile['permissions'],
     },
     {
       text: 'Compras',
       icon: <ShoppingCart />,
       path: '/compras',
-      permission: 'proveedores' as keyof typeof userProfile.permissions,
+      permission: 'proveedores' as keyof UserProfile['permissions'],
     },
     {
       text: 'Pagos',
       icon: <Payment />,
       path: '/pagos',
-      permission: 'proveedores' as keyof typeof userProfile.permissions,
+      permission: 'proveedores' as keyof UserProfile['permissions'],
     },
     {
       text: 'Tiendas',
       icon: <StoreIcon />,
       path: '/tiendas',
-      permission: 'multitienda' as keyof typeof userProfile.permissions,
+      permission: 'multitienda' as keyof UserProfile['permissions'],
     },
     {
       text: 'Usuarios',
       icon: <People />,
       path: '/usuarios',
-      permission: 'configuracion' as keyof typeof userProfile.permissions,
+      permission: 'configuracion' as keyof UserProfile['permissions'],
     },
     {
       text: 'Reportes',
       icon: <Assessment />,
       path: '/reportes',
-      permission: 'reportes' as keyof typeof userProfile.permissions,
+      permission: 'reportes' as keyof UserProfile['permissions'],
     },
     {
       text: 'Configuración',
       icon: <Settings />,
       path: '/configuracion',
-      permission: 'configuracion' as keyof typeof userProfile.permissions,
+      permission: 'configuracion' as keyof UserProfile['permissions'],
     },
   ];
 

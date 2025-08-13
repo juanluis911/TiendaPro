@@ -1,4 +1,4 @@
-// src/pages/Dashboard.tsx
+// src/pages/Dashboard.tsx - Versión sin warnings de MUI
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -211,9 +211,11 @@ const Dashboard: React.FC = () => {
           </Typography>
         </Box>
         <Tooltip title="Actualizar datos">
-          <IconButton onClick={loadDashboardData} disabled={loading}>
-            <Refresh />
-          </IconButton>
+          <span>
+            <IconButton onClick={loadDashboardData} disabled={loading}>
+              <Refresh />
+            </IconButton>
+          </span>
         </Tooltip>
       </Box>
 

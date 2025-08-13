@@ -11,6 +11,7 @@ import 'dayjs/locale/es';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './components/auth/Login';
+import Register from './components/auth/Register';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Proveedores from './pages/Proveedores';
@@ -106,8 +107,9 @@ const App: React.FC = () => {
           <AuthProvider>
             <Router>
               <Routes>
-                {/* Ruta de login */}
+                {/* Rutas públicas */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
                 
                 {/* Rutas protegidas */}
                 <Route path="/" element={

@@ -10,13 +10,15 @@ import {
   Alert,
   CircularProgress,
   Container,
-  Paper
+  Paper,
+  Divider,
 } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../contexts/AuthContext';
 import { Store as StoreIcon } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 
 const schema = yup.object({
   email: yup
@@ -187,6 +189,7 @@ const Login: React.FC = () => {
                   py: 1.5,
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
+                  mb: 2,
                 }}
               >
                 {loading ? (
@@ -197,18 +200,32 @@ const Login: React.FC = () => {
               </Button>
             </Box>
 
-            <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Divider sx={{ my: 3 }}>
               <Typography variant="body2" color="text.secondary">
-                ¿Necesitas una cuenta?{' '}
-                <Button
-                  variant="text"
-                  size="small"
-                  disabled={loading}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Contacta al administrador
-                </Button>
+                o
               </Typography>
+            </Divider>
+
+            {/* Registro */}
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                ¿No tienes una cuenta?
+              </Typography>
+              <Button
+                component={Link}
+                to="/register"
+                variant="outlined"
+                fullWidth
+                size="large"
+                disabled={loading}
+                sx={{
+                  py: 1.5,
+                  fontSize: '1.1rem',
+                  textTransform: 'none',
+                }}
+              >
+                Crear cuenta gratuita
+              </Button>
             </Box>
           </CardContent>
         </Paper>
