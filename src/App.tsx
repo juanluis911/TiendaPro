@@ -23,6 +23,8 @@ import Reportes from './pages/Reportes';
 import Configuracion from './pages/Configuracion';
 import NotFound from './pages/NotFound';
 
+
+
 // Configuración del tema
 const theme = createTheme({
   palette: {

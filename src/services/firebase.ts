@@ -185,6 +185,255 @@ export class UserService extends FirebaseService<UserProfile> {
     ]);
     return results.length > 0 ? results[0] : null;
   }
+
+  // Método para crear usuario con ID específico (para cuando Firebase Auth crea el usuario)
+  async createWithId(uid: string, data: Omit<UserProfile, 'uid'>): Promise<void> {
+    try {
+      await setDoc(doc(db, 'users', uid), {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error creating user with ID:', error);
+      throw error;
+    }
+  }
+
+  // Método para obtener usuarios por organización con filtros avanzados
+  async getByOrganizationWithFilters(
+    organizationId: string,
+    filters?: {
+      role?: UserRole;
+      active?: boolean;
+      storeAccess?: string;
+    }
+  ): Promise<UserProfile[]> {
+    try {
+      let q = query(
+        collection(db, 'users'),
+        where('organizationId', '==', organizationId),
+        orderBy('createdAt', 'desc')
+      );
+
+      // Aplicar filtros adicionales
+      if (filters?.role) {
+        q = query(q, where('role', '==', filters.role));
+      }
+
+      if (filters?.active !== undefined) {
+        q = query(q, where('active', '==', filters.active));
+      }
+
+      const snapshot = await getDocs(q);
+      let users = snapshot.docs.map(doc => ({
+        uid: doc.id,
+        ...doc.data()
+      } as UserProfile));
+
+      // Filtrar por acceso a tienda (no se puede hacer en Firestore directamente)
+      if (filters?.storeAccess) {
+        users = users.filter(user => 
+          user.storeAccess.includes(filters.storeAccess!)
+        );
+      }
+
+      return users;
+    } catch (error) {
+      console.error('Error getting users with filters:', error);
+      throw error;
+    }
+  }
+
+  // Método para obtener estadísticas de usuarios
+  async getUserStats(organizationId: string): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    byRole: Record<UserRole, number>;
+    createdThisMonth: number;
+  }> {
+    try {
+      const users = await this.getByOrganizationId(organizationId);
+      
+      const stats = {
+        total: users.length,
+        active: users.filter(u => u.active).length,
+        inactive: users.filter(u => !u.active).length,
+        byRole: {
+          owner: users.filter(u => u.role === 'owner').length,
+          admin: users.filter(u => u.role === 'admin').length,
+          manager: users.filter(u => u.role === 'manager').length,
+          empleado: users.filter(u => u.role === 'empleado').length,
+          vendedor: users.filter(u => u.role === 'vendedor').length,
+        } as Record<UserRole, number>,
+        createdThisMonth: 0
+      };
+
+      // Calcular usuarios creados este mes
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      stats.createdThisMonth = users.filter(user => {
+        const createdDate = user.createdAt.toDate();
+        return createdDate >= startOfMonth;
+      }).length;
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting user stats:', error);
+      throw error;
+    }
+  }
+
+  // Método para verificar si un email ya existe en la organización
+  async emailExistsInOrganization(email: string, organizationId: string): Promise<boolean> {
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('email', '==', email),
+        where('organizationId', '==', organizationId)
+      );
+      
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    } catch (error) {
+      console.error('Error checking email existence:', error);
+      throw error;
+    }
+  }
+
+  // Método para obtener usuarios por tienda específica
+  async getUsersByStore(storeId: string): Promise<UserProfile[]> {
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('storeAccess', 'array-contains', storeId),
+        where('active', '==', true),
+        orderBy('role'),
+        orderBy('displayName')
+      );
+      
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        uid: doc.id,
+        ...doc.data()
+      } as UserProfile));
+    } catch (error) {
+      console.error('Error getting users by store:', error);
+      throw error;
+    }
+  }
+
+  // Método para actualizar acceso a tiendas de múltiples usuarios
+  async updateStoreAccessBatch(
+    userIds: string[],
+    storeId: string,
+    action: 'add' | 'remove'
+  ): Promise<void> {
+    try {
+      const batch = writeBatch(db);
+      
+      for (const userId of userIds) {
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserProfile;
+          let newStoreAccess = [...userData.storeAccess];
+          
+          if (action === 'add' && !newStoreAccess.includes(storeId)) {
+            newStoreAccess.push(storeId);
+          } else if (action === 'remove') {
+            newStoreAccess = newStoreAccess.filter(id => id !== storeId);
+          }
+          
+          batch.update(userRef, {
+            storeAccess: newStoreAccess,
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+      
+      await batch.commit();
+    } catch (error) {
+      console.error('Error updating store access batch:', error);
+      throw error;
+    }
+  }
+
+  // Método para obtener usuarios con permisos específicos
+  async getUsersWithPermission(
+    organizationId: string,
+    permission: keyof UserProfile['permissions']
+  ): Promise<UserProfile[]> {
+    try {
+      const users = await this.getByOrganizationId(organizationId);
+      return users.filter(user => 
+        user.active && user.permissions[permission]
+      );
+    } catch (error) {
+      console.error('Error getting users with permission:', error);
+      throw error;
+    }
+  }
+
+  // Método para cambiar el rol de un usuario y ajustar permisos automáticamente
+  async updateUserRole(userId: string, newRole: UserRole): Promise<void> {
+    try {
+      // Definir permisos por defecto según el rol
+      const defaultPermissions = {
+        owner: {
+          proveedores: true,
+          inventario: true,
+          ventas: true,
+          reportes: true,
+          configuracion: true,
+          multitienda: true,
+        },
+        admin: {
+          proveedores: true,
+          inventario: true,
+          ventas: true,
+          reportes: true,
+          configuracion: true,
+          multitienda: true,
+        },
+        manager: {
+          proveedores: true,
+          inventario: true,
+          ventas: true,
+          reportes: true,
+          configuracion: false,
+          multitienda: false,
+        },
+        empleado: {
+          proveedores: true,
+          inventario: true,
+          ventas: false,
+          reportes: false,
+          configuracion: false,
+          multitienda: false,
+        },
+        vendedor: {
+          proveedores: false,
+          inventario: true,
+          ventas: true,
+          reportes: false,
+          configuracion: false,
+          multitienda: false,
+        },
+      };
+
+      await this.update(userId, {
+        role: newRole,
+        permissions: defaultPermissions[newRole]
+      });
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      throw error;
+    }
+  }
 }
 
 // Servicio específico para Proveedores

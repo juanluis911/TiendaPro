@@ -5,101 +5,129 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  DialogContentText,
   Button,
-  Typography,
   Box,
-  Alert,
+  Typography,
+  IconButton,
 } from '@mui/material';
 import {
   Warning as WarningIcon,
   Error as ErrorIcon,
   Info as InfoIcon,
-  CheckCircle as CheckCircleIcon,
+  CheckCircle as SuccessIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 
 interface ConfirmDialogProps {
   open: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
   title: string;
   message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
   confirmColor?: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
   severity?: 'warning' | 'error' | 'info' | 'success';
   loading?: boolean;
+  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
+
+const severityIcons = {
+  warning: WarningIcon,
+  error: ErrorIcon,
+  info: InfoIcon,
+  success: SuccessIcon,
+};
+
+const severityColors = {
+  warning: '#ff9800',
+  error: '#f44336',
+  info: '#2196f3',
+  success: '#4caf50',
+};
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   open,
-  onClose,
-  onConfirm,
   title,
   message,
+  onConfirm,
+  onCancel,
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   confirmColor = 'primary',
   severity = 'warning',
   loading = false,
+  maxWidth = 'sm',
 }) => {
-  const getIcon = () => {
-    switch (severity) {
-      case 'error':
-        return <ErrorIcon color="error" sx={{ fontSize: 48 }} />;
-      case 'warning':
-        return <WarningIcon color="warning" sx={{ fontSize: 48 }} />;
-      case 'info':
-        return <InfoIcon color="info" sx={{ fontSize: 48 }} />;
-      case 'success':
-        return <CheckCircleIcon color="success" sx={{ fontSize: 48 }} />;
-      default:
-        return <WarningIcon color="warning" sx={{ fontSize: 48 }} />;
-    }
-  };
+  const IconComponent = severityIcons[severity];
+  const iconColor = severityColors[severity];
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
-      maxWidth="sm"
+      onClose={onCancel}
+      maxWidth={maxWidth}
       fullWidth
       PaperProps={{
-        sx: { borderRadius: 2 },
+        sx: {
+          borderRadius: 2,
+        }
       }}
     >
-      <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
-        <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
-          {getIcon()}
-          <Typography variant="h6" component="div">
-            {title}
-          </Typography>
+      <DialogTitle sx={{ pb: 1 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <IconComponent 
+              sx={{ 
+                color: iconColor,
+                fontSize: 28 
+              }} 
+            />
+            <Typography variant="h6" component="div">
+              {title}
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={onCancel}
+            size="small"
+            disabled={loading}
+            sx={{ mt: -0.5, mr: -0.5 }}
+          >
+            <CloseIcon />
+          </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ textAlign: 'center', pt: 1 }}>
-        <Typography variant="body1" color="text.secondary">
+      <DialogContent sx={{ pt: 1 }}>
+        <DialogContentText
+          sx={{
+            color: 'text.primary',
+            fontSize: '1rem',
+            lineHeight: 1.5,
+          }}
+        >
           {message}
-        </Typography>
+        </DialogContentText>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, gap: 1, justifyContent: 'center' }}>
-        <Button
-          onClick={onClose}
-          variant="outlined"
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button 
+          onClick={onCancel}
           disabled={loading}
-          size="large"
+          variant="outlined"
+          color="inherit"
         >
           {cancelText}
         </Button>
         <Button
           onClick={onConfirm}
+          disabled={loading}
           variant="contained"
           color={confirmColor}
-          disabled={loading}
-          size="large"
-          sx={{ minWidth: 120 }}
+          autoFocus
         >
-          {confirmText}
+          {loading ? 'Procesando...' : confirmText}
         </Button>
       </DialogActions>
     </Dialog>
