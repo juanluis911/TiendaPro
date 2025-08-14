@@ -1,4 +1,4 @@
-// vite.config.ts
+// vite.config.mjs
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -14,7 +14,6 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    // Definir process para compatibilidad con algunas librerías
     'process.env': {},
   },
   optimizeDeps: {
