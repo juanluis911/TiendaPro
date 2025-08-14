@@ -12,7 +12,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
-import MainLayout from './components/layout/MainLayout';
+import MainLayout from './components/Layout/MainLayout';
+
 import Dashboard from './pages/Dashboard';
 import Proveedores from './pages/Proveedores';
 import Compras from './pages/Compras';
