@@ -39,7 +39,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
+    "build:prod": "vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "firebase:emulators": "firebase emulators:start",
