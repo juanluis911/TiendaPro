@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Sistema de gestión multi-tienda para abarrotes y fruterías",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
@@ -24,18 +24,18 @@
     "recharts": "^3.1.2",
     "uuid": "^9.0.0",
     "yup": "^1.2.0",
-    "serve": "^14.2.1"
+    "serve": "^14.2.1",
+    "vite": "^4.4.5",
+    "@vitejs/plugin-react": "^4.0.3",
+    "typescript": "^5.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@types/uuid": "^9.0.2",
-    "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.15",
-    "typescript": "^5.0.2",
-    "vite": "^4.4.5"
+    "tailwindcss": "^3.4.15"
   },
   "scripts": {
     "dev": "vite",
@@ -45,17 +45,5 @@
     "firebase:emulators": "firebase emulators:start",
     "firebase:deploy": "firebase deploy",
     "start": "serve -s dist -l 3000"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
   }
 }
