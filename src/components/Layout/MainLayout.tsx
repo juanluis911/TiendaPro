@@ -91,6 +91,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       path: '/dashboard',
       permission: null,
     },
+    /*
     {
       text: 'Punto de Venta',  // ← NUEVO ITEM
       icon: <PointOfSaleRounded />,
@@ -98,6 +99,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       permission: null, // Sin permisos especiales
       openInNewTab: true, // ← NUEVA PROPIEDAD
     },
+    */
     {
       text: 'Proveedores',
       icon: <Business />,

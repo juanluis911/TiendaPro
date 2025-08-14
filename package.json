@@ -23,7 +23,8 @@
     "react-router-dom": "^6.15.0",
     "recharts": "^3.1.2",
     "uuid": "^9.0.0",
-    "yup": "^1.2.0"
+    "yup": "^1.2.0",
+    "serve": "^14.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.21",
@@ -42,7 +43,8 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "firebase:emulators": "firebase emulators:start",
-    "firebase:deploy": "firebase deploy"
+    "firebase:deploy": "firebase deploy",
+    "start": "serve -s dist -l 3000"
   },
   "browserslist": {
     "production": [
