@@ -18,7 +18,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../../contexts/AuthContext';
 import { Store as StoreIcon } from '@mui/icons-material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // ← AGREGAR useNavigate y useLocation
 
 const schema = yup.object({
   email: yup
@@ -38,6 +38,8 @@ interface LoginFormData {
 
 const Login: React.FC = () => {
   const { signIn } = useAuth();
+  const navigate = useNavigate(); // ← AGREGAR
+  const location = useLocation(); // ← AGREGAR
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +61,12 @@ const Login: React.FC = () => {
 
     try {
       await signIn(data.email, data.password);
+      
+      // ← AGREGAR REDIRECCIÓN DESPUÉS DEL LOGIN EXITOSO
+      // Obtener la página desde donde vino (si existe) o ir al dashboard por defecto
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+      
     } catch (error: any) {
       console.error('Login error:', error);
       
